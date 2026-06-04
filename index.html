@@ -544,8 +544,17 @@ async function findProduct(code) {
 }
 
 // ==================== PANEL DE PRODUCTO ====================
+function getLocalLastConteo(cod) {
+  // Buscar el último conteo local (el de índice más alto)
+  const matches = state.conteos.filter(c => c.cod === cod);
+  if (matches.length === 0) return null;
+  const last = matches[matches.length - 1];
+  const quien = last.operador || 'Tú';
+  return `${quien} — ${last.qty} uds. (local)`;
+}
+
 async function loadUltimoConteo(cod) {
-  if (!state.isOnline) return null;
+  if (!state.isOnline) return getLocalLastConteo(cod);
   try {
     const { data, error } = await supabaseClient
       .from('conteos')
@@ -554,12 +563,12 @@ async function loadUltimoConteo(cod) {
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();
-    if (error || !data) return null;
+    if (error || !data) return getLocalLastConteo(cod);
     const fecha = new Date(data.created_at).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
     return `${data.operador || 'alguien'} — ${data.cantidad} uds. el ${fecha}`;
   } catch (err) {
     console.error('Error al cargar último conteo:', err);
-    return null;
+    return getLocalLastConteo(cod);
   }
 }
 
@@ -591,6 +600,7 @@ function showProductPanel(prod, isNew) {
     loadUltimoConteo(prod.cod_interno).then(info => {
       if (info) {
         ultimoDetalle.textContent = info;
+        ultimoDiv.style.display = 'block';
       } else {
         ultimoDiv.style.display = 'none';
       }
@@ -671,7 +681,8 @@ function countAsNew() {
     ubic: state.location,
     ubicObs: document.getElementById('ubicObsInput')?.value.trim().toUpperCase() || null,
     synced: false,
-    incomplete: true
+    incomplete: true,
+    operador: state.operator || state.user.email
   });
   saveConteos();
   updateDailyStats();
@@ -693,6 +704,7 @@ function addToCount() {
   if (existing) {
     existing.qty += state.currentQty;
     if (ubicObs) existing.ubicObs = ubicObs;
+    existing.operador = state.operator || state.user.email; // actualiza quien lo contó
   } else {
     state.conteos.push({
       cod: prod.cod_interno,
@@ -702,7 +714,8 @@ function addToCount() {
       ubic: state.location,
       ubicObs: ubicObs,
       synced: false,
-      incomplete: false
+      incomplete: false,
+      operador: state.operator || state.user.email
     });
   }
   saveConteos();
