@@ -227,6 +227,9 @@ body{display:flex;flex-direction:column}
     <span id="stockText">Stock: -</span>
     <span class="counted-today" id="countedToday">Contado hoy: 0</span>
   </div>
+  <div style="font-size:11px;color:var(--tx-2);margin-bottom:6px;display:none" id="ultimoConteoInfo">
+    🕓 Último conteo: <span id="ultimoConteoDetalle"></span>
+  </div>
   <div class="qty-row">
     <button class="qbtn" onclick="changeQty(-1)">−</button>
     <input class="qnum" id="qtyInput" type="number" value="1" min="1" onchange="validateQty()">
@@ -533,6 +536,20 @@ async function findProduct(code) {
 }
 
 // ==================== PANEL DE PRODUCTO ====================
+async function loadUltimoConteo(cod) {
+  if (!state.isOnline) return null;
+  const { data, error } = await supabaseClient
+    .from('conteos')
+    .select('cantidad, operador, created_at')
+    .eq('producto_cod', cod)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error || !data) return null;
+  const fecha = new Date(data.created_at).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
+  return `${data.operador || 'alguien'} — ${data.cantidad} uds. el ${fecha}`;
+}
+
 function showProductPanel(prod, isNew) {
   const panel = document.getElementById('productPanel');
   document.getElementById('prodCode').textContent = prod.cod_interno;
@@ -554,6 +571,23 @@ function showProductPanel(prod, isNew) {
   // Veces contado hoy
   const veces = state.conteos.filter(c => c.cod === prod.cod_interno).length;
   document.getElementById('countedToday').textContent = `Contado hoy: ${veces} vez${veces !== 1 ? 'es' : ''}`;
+
+  // Último conteo histórico (desde BD)
+  const ultimoDiv = document.getElementById('ultimoConteoInfo');
+  const ultimoDetalle = document.getElementById('ultimoConteoDetalle');
+  if (!isNew) {
+    ultimoDiv.style.display = 'block';
+    ultimoDetalle.textContent = 'Buscando...';
+    loadUltimoConteo(prod.cod_interno).then(info => {
+      if (info) {
+        ultimoDetalle.textContent = info;
+      } else {
+        ultimoDiv.style.display = 'none';
+      }
+    });
+  } else {
+    ultimoDiv.style.display = 'none';
+  }
   
   const badge = document.getElementById('prodBadge');
   if (isNew) {
@@ -798,6 +832,66 @@ async function syncAll() {
         });
         c.incomplete = false;
       }
+      // Primero actualizar el stock en productos
+      const { error: stockError } = await supabaseClient.rpc('actualizar_stock_conteo', {
+        p_cod: c.cod,
+        p_cantidad: c.qty,
+        p_nombre: c.incomplete && c.nom ? c.nom : null,
+        p_unidad: c.unit || 'u'
+      });
+      if (stockError) throw stockError;
+
+      // Luego insertar en el historial de conteos
+      // Primero actualizar el stock en productos
+      const { error: stockError } = await supabaseClient.rpc('actualizar_stock_conteo', {
+        p_cod: c.cod,
+        p_cantidad: c.qty,
+        p_nombre: c.incomplete && c.nom ? c.nom : null,
+        p_unidad: c.unit || 'u'
+      });
+      if (stockError) throw stockError;
+
+      // Luego insertar en el historial de conteos
+      // Primero actualizar el stock en productos
+      const { error: stockError } = await supabaseClient.rpc('actualizar_stock_conteo', {
+        p_cod: c.cod,
+        p_cantidad: c.qty,
+        p_nombre: c.incomplete && c.nom ? c.nom : null,
+        p_unidad: c.unit || 'u'
+      });
+      if (stockError) throw stockError;
+
+      // Luego insertar en el historial de conteos
+      // Primero actualizar el stock en productos
+      const { error: stockError } = await supabaseClient.rpc('actualizar_stock_conteo', {
+        p_cod: c.cod,
+        p_cantidad: c.qty,
+        p_nombre: c.incomplete && c.nom ? c.nom : null,
+        p_unidad: c.unit || 'u'
+      });
+      if (stockError) throw stockError;
+
+      // Luego insertar en el historial de conteos
+      // Primero actualizar el stock en productos
+      const { error: stockError } = await supabaseClient.rpc('actualizar_stock_conteo', {
+        p_cod: c.cod,
+        p_cantidad: c.qty,
+        p_nombre: c.incomplete && c.nom ? c.nom : null,
+        p_unidad: c.unit || 'u'
+      });
+      if (stockError) throw stockError;
+
+      // Luego insertar en el historial de conteos
+      // Primero actualizar el stock en productos
+      const { error: stockError } = await supabaseClient.rpc('actualizar_stock_conteo', {
+        p_cod: c.cod,
+        p_cantidad: c.qty,
+        p_nombre: c.incomplete && c.nom ? c.nom : null,
+        p_unidad: c.unit || 'u'
+      });
+      if (stockError) throw stockError;
+
+      // Luego insertar en el historial de conteos
       // Primero actualizar el stock en productos
       const { error: stockError } = await supabaseClient.rpc('actualizar_stock_conteo', {
         p_cod: c.cod,
