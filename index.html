@@ -331,24 +331,27 @@ const state = {
   isOnline: navigator.onLine,
   scannerActive: false,
   html5QrCode: null,
-  recentLocations: [],   // últimas ubicaciones usadas
-  dailyProducts: 0,      // conteo visual del día (productos únicos)
-  dailyUnits: 0,         // unidades totales del día
+  recentLocations: [],
+  dailyProducts: 0,
+  dailyUnits: 0,
   currentFilter: 'pendientes'
 };
 
 // ==================== INICIALIZACIÓN ====================
 window.addEventListener('DOMContentLoaded', async () => {
-  // Cargar configuración local
   state.operator = localStorage.getItem('scOperator') || '';
   state.location = localStorage.getItem('scLocation') || 'Depósito A';
   state.recentLocations = JSON.parse(localStorage.getItem('scRecentLocs') || '[]');
   
-  const { data: { session } } = await supabaseClient.auth.getSession();
-  if (session) {
-    state.user = session.user;
-    await loadUserProfile();
-    showApp();
+  try {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (session) {
+      state.user = session.user;
+      await loadUserProfile();
+      showApp();
+    }
+  } catch (err) {
+    console.error('Error al recuperar sesión:', err);
   }
   
   window.addEventListener('online', () => { state.isOnline = true; updateConnStatus(); });
@@ -373,7 +376,6 @@ window.addEventListener('DOMContentLoaded', async () => {
     }
   });
   
-  // Navegación inferior
   document.querySelectorAll('.nav-item').forEach(item => {
     item.addEventListener('click', function(){
       const screen = this.dataset.screen;
@@ -383,7 +385,6 @@ window.addEventListener('DOMContentLoaded', async () => {
     });
   });
   
-  // Filtros de conteos
   document.querySelectorAll('.filter-pill').forEach(pill => {
     pill.addEventListener('click', function(){
       document.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
@@ -393,7 +394,6 @@ window.addEventListener('DOMContentLoaded', async () => {
     });
   });
   
-  // Gestos en el panel de producto
   const panel = document.getElementById('productPanel');
   let touchStartX = 0, touchStartY = 0;
   panel.addEventListener('touchstart', (e) => {
@@ -404,23 +404,24 @@ window.addEventListener('DOMContentLoaded', async () => {
     const dx = e.changedTouches[0].clientX - touchStartX;
     const dy = e.changedTouches[0].clientY - touchStartY;
     if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy)) {
-      // Swipe horizontal -> descartar
       hideProductPanel();
       toastMsg('Producto descartado', 'inf');
     } else if (dy < -60 && Math.abs(dy) > Math.abs(dx)) {
-      // Swipe up -> agregar
       addToCount();
     }
   });
   
-  // Iniciar cámara al mostrar scanner
   if (state.screen === 'scanner') startScanner();
 });
 
 async function loadUserProfile() {
-  // Obtener nombre del perfil en Supabase
-  const { data } = await supabaseClient.from('perfiles').select('nombre_completo').eq('user_id', state.user.id).maybeSingle();
-  state.userProfile = data?.nombre_completo || state.user.email;
+  try {
+    const { data } = await supabaseClient.from('perfiles').select('nombre_completo').eq('user_id', state.user.id).maybeSingle();
+    state.userProfile = data?.nombre_completo || state.user.email;
+  } catch (err) {
+    console.warn('No se pudo cargar el perfil:', err);
+    state.userProfile = state.user.email;
+  }
 }
 
 function showApp() {
@@ -436,7 +437,6 @@ function showApp() {
     document.getElementById('cfgOtherLocInput').value = state.location;
   }
   
-  // Cargar conteos guardados y calcular estadísticas del día
   loadSavedConteos();
   updateDailyStats();
   updateConnStatus();
@@ -450,12 +450,16 @@ async function login() {
   const errEl = document.getElementById('loginError');
   errEl.textContent = '';
   if (!email || !password) { errEl.textContent = 'Completá todos los campos.'; return; }
-  const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
-  if (error) { errEl.textContent = error.message; }
-  else {
-    state.user = data.user;
-    await loadUserProfile();
-    showApp();
+  try {
+    const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+    if (error) { errEl.textContent = error.message; }
+    else {
+      state.user = data.user;
+      await loadUserProfile();
+      showApp();
+    }
+  } catch (err) {
+    errEl.textContent = 'Error inesperado: ' + err.message;
   }
 }
 
@@ -526,11 +530,15 @@ async function findProduct(code) {
   const cache = JSON.parse(localStorage.getItem('scProductCache') || '{}');
   if (cache[code]) return cache[code];
   if (!state.isOnline) return null;
-  const { data } = await supabaseClient.from('productos').select('cod_interno, nombre, unidad_base, stock_actual').eq('cod_interno', code).maybeSingle();
-  if (data) {
-    cache[code] = data;
-    localStorage.setItem('scProductCache', JSON.stringify(cache));
-    return data;
+  try {
+    const { data } = await supabaseClient.from('productos').select('cod_interno, nombre, unidad_base, stock_actual').eq('cod_interno', code).maybeSingle();
+    if (data) {
+      cache[code] = data;
+      localStorage.setItem('scProductCache', JSON.stringify(cache));
+      return data;
+    }
+  } catch (err) {
+    console.error('Error al buscar producto:', err);
   }
   return null;
 }
@@ -538,16 +546,21 @@ async function findProduct(code) {
 // ==================== PANEL DE PRODUCTO ====================
 async function loadUltimoConteo(cod) {
   if (!state.isOnline) return null;
-  const { data, error } = await supabaseClient
-    .from('conteos')
-    .select('cantidad, operador, created_at')
-    .eq('producto_cod', cod)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (error || !data) return null;
-  const fecha = new Date(data.created_at).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
-  return `${data.operador || 'alguien'} — ${data.cantidad} uds. el ${fecha}`;
+  try {
+    const { data, error } = await supabaseClient
+      .from('conteos')
+      .select('cantidad, operador, created_at')
+      .eq('producto_cod', cod)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error || !data) return null;
+    const fecha = new Date(data.created_at).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
+    return `${data.operador || 'alguien'} — ${data.cantidad} uds. el ${fecha}`;
+  } catch (err) {
+    console.error('Error al cargar último conteo:', err);
+    return null;
+  }
 }
 
 function showProductPanel(prod, isNew) {
@@ -556,7 +569,6 @@ function showProductPanel(prod, isNew) {
   document.getElementById('prodName').textContent = prod.nombre || '(Nombre pendiente)';
   document.getElementById('qtyInput').value = state.currentQty;
   
-  // Stock bar
   const stock = prod.stock_actual || 0;
   const stockMin = prod.stock_minimo || 10;
   let pct = Math.min(100, (stock / stockMin) * 100);
@@ -568,11 +580,9 @@ function showProductPanel(prod, isNew) {
   fill.style.background = color;
   document.getElementById('stockText').textContent = `Stock: ${stock} ${prod.unidad_base || 'u'}`;
   
-  // Veces contado hoy
   const veces = state.conteos.filter(c => c.cod === prod.cod_interno).length;
   document.getElementById('countedToday').textContent = `Contado hoy: ${veces} vez${veces !== 1 ? 'es' : ''}`;
 
-  // Último conteo histórico (desde BD)
   const ultimoDiv = document.getElementById('ultimoConteoInfo');
   const ultimoDetalle = document.getElementById('ultimoConteoDetalle');
   if (!isNew) {
@@ -602,9 +612,7 @@ function showProductPanel(prod, isNew) {
     document.getElementById('addBtn').style.display = 'block';
   }
   
-  // Ubicaciones recientes
   renderUbicChips();
-  
   panel.classList.add('visible');
 }
 
@@ -622,17 +630,16 @@ function renderUbicChips() {
     container.innerHTML = '';
     return;
   }
-  container.innerHTML = state.recentLocations.map(loc => `<span class="chip" onclick="selectUbicChip('${loc}')">📍 ${loc}</span>`).join('') +
+  container.innerHTML = state.recentLocations.map(loc => `<span class="chip" onclick="selectUbicChip(event, '${loc}')">📍 ${loc}</span>`).join('') +
     `<span class="chip" onclick="showUbicInput()">✏️ Otra</span>`;
   document.getElementById('ubicObsInput').style.display = 'none';
 }
 
-function selectUbicChip(loc) {
+function selectUbicChip(e, loc) {
   document.getElementById('ubicObsInput').value = loc;
   document.getElementById('ubicObsInput').style.display = 'block';
-  // Resaltar chip activo
   document.querySelectorAll('#ubicChipsContainer .chip').forEach(c => c.classList.remove('active'));
-  event.target.classList.add('active');
+  e.target.classList.add('active');
 }
 
 function showUbicInput() {
@@ -710,9 +717,8 @@ function saveConteos() {
 }
 
 function updateDailyStats() {
-  const todayConteos = state.conteos.filter(c => !c.synced || true); // mostramos todos los del array local
-  const uniqueProducts = new Set(todayConteos.map(c => c.cod)).size;
-  const totalUnits = todayConteos.reduce((sum, c) => sum + c.qty, 0);
+  const uniqueProducts = new Set(state.conteos.map(c => c.cod)).size;
+  const totalUnits = state.conteos.reduce((sum, c) => sum + c.qty, 0);
   state.dailyProducts = uniqueProducts;
   state.dailyUnits = totalUnits;
   document.getElementById('dailyStats').textContent = `Hoy: ${uniqueProducts} prod · ${totalUnits} uds`;
@@ -830,7 +836,6 @@ async function syncAll() {
   
   try {
     for (const c of pendientes) {
-      // Si está incompleto y ya tiene nombre, primero dar de alta el producto
       if (c.incomplete && c.nom) {
         await supabaseClient.rpc('alta_producto_rapido', {
           p_cod: c.cod,
@@ -841,7 +846,6 @@ async function syncAll() {
         c.incomplete = false;
       }
       
-      // Actualizar stock en productos
       const { error: stockError } = await supabaseClient.rpc('actualizar_stock_conteo', {
         p_cod: c.cod,
         p_cantidad: c.qty,
@@ -850,7 +854,6 @@ async function syncAll() {
       });
       if (stockError) throw stockError;
 
-      // Insertar en historial de conteos
       await supabaseClient.from('conteos').insert({
         user_id: state.user.id,
         producto_cod: c.cod,
@@ -949,7 +952,6 @@ function toastMsg(msg, type = 'inf') {
   setTimeout(() => el.remove(), 2200);
 }
 
-// Cerrar sheets al hacer clic fuera
 document.querySelectorAll('.sheet-overlay').forEach(overlay => {
   overlay.addEventListener('click', function(e) {
     if (e.target === this) this.classList.remove('open');
