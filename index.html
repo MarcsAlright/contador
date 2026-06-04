@@ -798,6 +798,26 @@ async function syncAll() {
         });
         c.incomplete = false;
       }
+      // Primero actualizar el stock en productos
+      const { error: stockError } = await supabaseClient.rpc('actualizar_stock_conteo', {
+        p_cod: c.cod,
+        p_cantidad: c.qty,
+        p_nombre: c.incomplete && c.nom ? c.nom : null,
+        p_unidad: c.unit || 'u'
+      });
+      if (stockError) throw stockError;
+
+      // Luego insertar en el historial de conteos
+      // Primero actualizar el stock en productos
+      const { error: stockError } = await supabaseClient.rpc('actualizar_stock_conteo', {
+        p_cod: c.cod,
+        p_cantidad: c.qty,
+        p_nombre: c.incomplete && c.nom ? c.nom : null,
+        p_unidad: c.unit || 'u'
+      });
+      if (stockError) throw stockError;
+
+      // Luego insertar en el historial de conteos
       await supabaseClient.from('conteos').insert({
         user_id: state.user.id,
         producto_cod: c.cod,
