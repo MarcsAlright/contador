@@ -65,10 +65,11 @@ body{display:flex;flex-direction:column}
 .visor-overlay.flash{opacity:1;background:rgba(34,208,122,.25)}
 .visor-overlay .check{font-size:48px;color:var(--green);display:none}
 .visor-overlay.flash .check{display:block}
-.visor-placeholder{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--tx-2);z-index:5}
-.visor-placeholder .cam-icon{font-size:40px;opacity:.5;margin-bottom:6px}
-.visor-placeholder .cam-text{font-size:11px;text-transform:uppercase;letter-spacing:1px}
-.visor-scanline{position:absolute;left:10%;right:10%;height:2px;background:var(--or);top:50%;z-index:6;box-shadow:0 0 12px var(--or);animation:scanLine 2.2s ease-in-out infinite}
+.visor-placeholder{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--tx-2);z-index:5;cursor:pointer}
+.visor-placeholder .cam-icon{font-size:48px;opacity:.6;margin-bottom:8px}
+.visor-placeholder .cam-text{font-size:13px;text-transform:uppercase;letter-spacing:1px;font-weight:600}
+.visor-placeholder .start-btn{display:inline-block;margin-top:12px;padding:8px 20px;background:var(--or);color:#fff;border-radius:20px;font-size:14px;font-weight:700;cursor:pointer}
+.visor-scanline{position:absolute;left:10%;right:10%;height:2px;background:var(--or);top:50%;z-index:6;box-shadow:0 0 12px var(--or);animation:scanLine 2.2s ease-in-out infinite;display:none}
 @keyframes scanLine{0%,100%{top:30%}50%{top:65%}}
 
 /* Búsqueda manual */
@@ -195,22 +196,23 @@ body{display:flex;flex-direction:column}
 
 <!-- Visor de escaneo -->
 <div class="visor-wrap" id="visor">
-  <div id="qr-reader"></div>
+  <div id="qr-reader" style="display:none"></div>
   <div class="visor-overlay" id="visorFlash"><span class="check">✓</span></div>
-  <div class="visor-placeholder" id="visorPlaceholder">
+  <div class="visor-placeholder" id="visorPlaceholder" onclick="startScanner()">
     <span class="cam-icon">📷</span>
-    <span class="cam-text">Apunta al código de barras o QR</span>
+    <span class="cam-text">Cámara apagada</span>
+    <span class="start-btn">Iniciar escáner</span>
   </div>
-  <div class="visor-scanline"></div>
+  <div class="visor-scanline" id="scanLine"></div>
 </div>
 
 <!-- Búsqueda manual -->
 <div class="search-row">
   <div class="search-inner">
     <span class="search-ico">🔍</span>
-    <input class="search-input" id="searchProd" placeholder="Código de barras o interno...">
+    <input class="search-input" id="searchProd" placeholder="Código de barras, QR o interno...">
   </div>
-  <button class="toggle-scan" id="toggleScanBtn" title="Alternar cámara">📷</button>
+  <button class="toggle-scan" id="toggleScanBtn" title="Apagar cámara" onclick="stopScanner()" style="display:none">🔴</button>
 </div>
 
 <!-- Panel de producto detectado (fijo abajo) -->
@@ -366,7 +368,6 @@ window.addEventListener('DOMContentLoaded', async () => {
   });
   
   document.getElementById('menuBtn').addEventListener('click', () => openSettings());
-  document.getElementById('toggleScanBtn').addEventListener('click', toggleScanner);
   
   document.getElementById('searchProd').addEventListener('keydown', function(e){
     if (e.key === 'Enter') {
@@ -411,7 +412,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     }
   });
   
-  if (state.screen === 'scanner') startScanner();
+  // No iniciamos la cámara automáticamente
 });
 
 async function loadUserProfile() {
@@ -440,7 +441,7 @@ function showApp() {
   loadSavedConteos();
   updateDailyStats();
   updateConnStatus();
-  startScanner();
+  // No iniciamos la cámara automáticamente
   toastMsg('📱 Stock Count listo', 'ok');
 }
 
@@ -467,6 +468,7 @@ async function login() {
 async function startScanner() {
   if (state.scannerActive) return;
   try {
+    document.getElementById('qr-reader').style.display = 'block';
     state.html5QrCode = new Html5Qrcode('qr-reader');
     await state.html5QrCode.start(
       { facingMode: 'environment' },
@@ -481,10 +483,12 @@ async function startScanner() {
     );
     state.scannerActive = true;
     document.getElementById('visorPlaceholder').style.display = 'none';
-    document.getElementById('toggleScanBtn').textContent = '🔴';
+    document.getElementById('scanLine').style.display = 'block';
+    document.getElementById('toggleScanBtn').style.display = 'flex';
   } catch (err) {
     console.error(err);
     document.getElementById('visorPlaceholder').innerHTML = '<span class="cam-icon">⚠️</span><span class="cam-text">Error de cámara</span>';
+    document.getElementById('visorPlaceholder').style.display = 'flex';
   }
 }
 
@@ -492,14 +496,16 @@ async function stopScanner() {
   if (state.html5QrCode && state.scannerActive) {
     await state.html5QrCode.stop();
     state.scannerActive = false;
+    document.getElementById('qr-reader').style.display = 'none';
     document.getElementById('visorPlaceholder').style.display = 'flex';
-    document.getElementById('toggleScanBtn').textContent = '📷';
+    document.getElementById('scanLine').style.display = 'none';
+    document.getElementById('toggleScanBtn').style.display = 'none';
+    document.getElementById('visorPlaceholder').innerHTML = `
+      <span class="cam-icon">📷</span>
+      <span class="cam-text">Cámara apagada</span>
+      <span class="start-btn" onclick="startScanner()">Iniciar escáner</span>
+    `;
   }
-}
-
-async function toggleScanner() {
-  if (state.scannerActive) await stopScanner();
-  else await startScanner();
 }
 
 function flashVisor() {
@@ -606,7 +612,6 @@ function showProductPanel(prod, isNew) {
     if (info) {
       ultimoDetalle.textContent = info;
     } else {
-      // Fallback local si existe
       const localInfo = getLocalLastConteo(prod.cod_interno);
       if (localInfo) {
         ultimoDetalle.textContent = localInfo + ' (local)';
@@ -765,7 +770,7 @@ function showConteos() {
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.querySelector('[data-screen="conteos"]').classList.add('active');
   state.screen = 'conteos';
-  stopScanner();
+  if (state.scannerActive) stopScanner();
   renderConteoList();
 }
 
@@ -777,7 +782,7 @@ function showScanner() {
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.querySelector('[data-screen="scanner"]').classList.add('active');
   state.screen = 'scanner';
-  startScanner();
+  // No iniciamos la cámara automáticamente; el usuario debe presionar el botón
 }
 
 function renderConteoList() {
