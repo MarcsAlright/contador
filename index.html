@@ -88,7 +88,7 @@ body{display:flex;flex-direction:column}
 .prod-stock-bar{height:4px;background:var(--bg-3);border-radius:2px;margin:8px 0;overflow:hidden}
 .prod-stock-bar-fill{height:100%;border-radius:2px;transition:width 0.3s}
 .stock-info{display:flex;justify-content:space-between;font-size:11px;color:var(--tx-2);margin-bottom:8px}
-.stock-info .counted-today{color:var(--blue);font-weight:500}
+.stock-info .pendientes{color:var(--blue);font-weight:500}
 .qty-row{display:flex;align-items:center;gap:8px;margin:12px 0}
 .qty-row .qbtn{width:48px;height:48px;border-radius:var(--r-m);border:1px solid var(--brd-1);background:var(--bg-3);color:var(--tx-0);font-size:24px;font-weight:700;display:flex;align-items:center;justify-content:center;cursor:pointer}
 .qty-row .qbtn:active{background:var(--or);color:#fff}
@@ -199,7 +199,7 @@ body{display:flex;flex-direction:column}
   <div class="visor-overlay" id="visorFlash"><span class="check">✓</span></div>
   <div class="visor-placeholder" id="visorPlaceholder">
     <span class="cam-icon">📷</span>
-    <span class="cam-text">Apunta al código de barras</span>
+    <span class="cam-text">Apunta al código de barras o QR</span>
   </div>
   <div class="visor-scanline"></div>
 </div>
@@ -225,10 +225,10 @@ body{display:flex;flex-direction:column}
   <div class="prod-stock-bar"><div class="prod-stock-bar-fill" id="stockBarFill" style="width:0%"></div></div>
   <div class="stock-info">
     <span id="stockText">Stock: -</span>
-    <span class="counted-today" id="countedToday">Contado hoy: 0</span>
+    <span class="pendientes" id="pendientesLocales">Pendientes locales: 0</span>
   </div>
-  <div style="font-size:11px;color:var(--tx-2);margin-bottom:6px;display:none" id="ultimoConteoInfo">
-    🕓 Último conteo: <span id="ultimoConteoDetalle"></span>
+  <div style="font-size:11px;color:var(--tx-2);margin-bottom:6px" id="ultimoConteoInfo">
+    🕓 Último conteo: <span id="ultimoConteoDetalle">Buscando...</span>
   </div>
   <div class="qty-row">
     <button class="qbtn" onclick="changeQty(-1)">−</button>
@@ -544,17 +544,14 @@ async function findProduct(code) {
 }
 
 // ==================== PANEL DE PRODUCTO ====================
-function getLocalLastConteo(cod) {
-  // Buscar el último conteo local (el de índice más alto)
-  const matches = state.conteos.filter(c => c.cod === cod);
-  if (matches.length === 0) return null;
-  const last = matches[matches.length - 1];
-  const quien = last.operador || 'Tú';
-  return `${quien} — ${last.qty} uds. (local)`;
+function getPendientesLocales(cod) {
+  const items = state.conteos.filter(c => c.cod === cod && !c.synced);
+  const total = items.reduce((sum, c) => sum + c.qty, 0);
+  return total;
 }
 
-async function loadUltimoConteo(cod) {
-  if (!state.isOnline) return getLocalLastConteo(cod);
+async function loadUltimoConteoRemoto(cod) {
+  if (!state.isOnline) return null;
   try {
     const { data, error } = await supabaseClient
       .from('conteos')
@@ -563,12 +560,18 @@ async function loadUltimoConteo(cod) {
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();
-    if (error || !data) return getLocalLastConteo(cod);
-    const fecha = new Date(data.created_at).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
+    if (error) {
+      console.error('Error en consulta de último conteo:', error);
+      return null;
+    }
+    if (!data) return null;
+    const fecha = new Date(data.created_at).toLocaleDateString('es-AR', { 
+      day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' 
+    });
     return `${data.operador || 'alguien'} — ${data.cantidad} uds. el ${fecha}`;
   } catch (err) {
-    console.error('Error al cargar último conteo:', err);
-    return getLocalLastConteo(cod);
+    console.error('Error al cargar último conteo remoto:', err);
+    return null;
   }
 }
 
@@ -578,6 +581,7 @@ function showProductPanel(prod, isNew) {
   document.getElementById('prodName').textContent = prod.nombre || '(Nombre pendiente)';
   document.getElementById('qtyInput').value = state.currentQty;
   
+  // Stock bar
   const stock = prod.stock_actual || 0;
   const stockMin = prod.stock_minimo || 10;
   let pct = Math.min(100, (stock / stockMin) * 100);
@@ -589,25 +593,31 @@ function showProductPanel(prod, isNew) {
   fill.style.background = color;
   document.getElementById('stockText').textContent = `Stock: ${stock} ${prod.unidad_base || 'u'}`;
   
-  const veces = state.conteos.filter(c => c.cod === prod.cod_interno).length;
-  document.getElementById('countedToday').textContent = `Contado hoy: ${veces} vez${veces !== 1 ? 'es' : ''}`;
-
-  const ultimoDiv = document.getElementById('ultimoConteoInfo');
+  // Pendientes locales
+  const pendientes = getPendientesLocales(prod.cod_interno);
+  document.getElementById('pendientesLocales').textContent = `Pendientes locales: ${pendientes} uds.`;
+  
+  // Último conteo (remoto)
   const ultimoDetalle = document.getElementById('ultimoConteoDetalle');
-  if (!isNew) {
-    ultimoDiv.style.display = 'block';
-    ultimoDetalle.textContent = 'Buscando...';
-    loadUltimoConteo(prod.cod_interno).then(info => {
-      if (info) {
-        ultimoDetalle.textContent = info;
-        ultimoDiv.style.display = 'block';
+  ultimoDetalle.textContent = 'Buscando...';
+  document.getElementById('ultimoConteoInfo').style.display = 'block';
+  
+  loadUltimoConteoRemoto(prod.cod_interno).then(info => {
+    if (info) {
+      ultimoDetalle.textContent = info;
+    } else {
+      // Fallback local si existe
+      const localInfo = getLocalLastConteo(prod.cod_interno);
+      if (localInfo) {
+        ultimoDetalle.textContent = localInfo + ' (local)';
       } else {
-        ultimoDiv.style.display = 'none';
+        ultimoDetalle.textContent = 'Sin registros previos';
       }
-    });
-  } else {
-    ultimoDiv.style.display = 'none';
-  }
+    }
+  }).catch(() => {
+    const localInfo = getLocalLastConteo(prod.cod_interno);
+    ultimoDetalle.textContent = localInfo ? localInfo + ' (local)' : 'Error al consultar';
+  });
   
   const badge = document.getElementById('prodBadge');
   if (isNew) {
@@ -624,6 +634,14 @@ function showProductPanel(prod, isNew) {
   
   renderUbicChips();
   panel.classList.add('visible');
+}
+
+function getLocalLastConteo(cod) {
+  const matches = state.conteos.filter(c => c.cod === cod);
+  if (matches.length === 0) return null;
+  const last = matches[matches.length - 1];
+  const quien = last.operador || 'Tú';
+  return `${quien} — ${last.qty} uds.`;
 }
 
 function hideProductPanel() {
@@ -704,7 +722,7 @@ function addToCount() {
   if (existing) {
     existing.qty += state.currentQty;
     if (ubicObs) existing.ubicObs = ubicObs;
-    existing.operador = state.operator || state.user.email; // actualiza quien lo contó
+    existing.operador = state.operator || state.user.email;
   } else {
     state.conteos.push({
       cod: prod.cod_interno,
