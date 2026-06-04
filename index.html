@@ -804,6 +804,14 @@ function updateConteoUnit(idx, val) {
   state.conteos[idx].unit = val;
 }
 
+function deleteConteo(idx) {
+  state.conteos.splice(idx, 1);
+  saveConteos();
+  updateDailyStats();
+  renderConteoList();
+  toastMsg('Conteo eliminado', 'inf');
+}
+
 function saveConteoEdit(idx) {
   saveConteos();
   updateDailyStats();
@@ -822,7 +830,7 @@ async function syncAll() {
   
   try {
     for (const c of pendientes) {
-      // Si está incompleto, primero crear producto
+      // Si está incompleto y ya tiene nombre, primero dar de alta el producto
       if (c.incomplete && c.nom) {
         await supabaseClient.rpc('alta_producto_rapido', {
           p_cod: c.cod,
@@ -832,7 +840,8 @@ async function syncAll() {
         });
         c.incomplete = false;
       }
-      // Primero actualizar el stock en productos
+      
+      // Actualizar stock en productos
       const { error: stockError } = await supabaseClient.rpc('actualizar_stock_conteo', {
         p_cod: c.cod,
         p_cantidad: c.qty,
@@ -841,77 +850,7 @@ async function syncAll() {
       });
       if (stockError) throw stockError;
 
-      // Luego insertar en el historial de conteos
-      // Primero actualizar el stock en productos
-      const { error: stockError } = await supabaseClient.rpc('actualizar_stock_conteo', {
-        p_cod: c.cod,
-        p_cantidad: c.qty,
-        p_nombre: c.incomplete && c.nom ? c.nom : null,
-        p_unidad: c.unit || 'u'
-      });
-      if (stockError) throw stockError;
-
-      // Luego insertar en el historial de conteos
-      // Primero actualizar el stock en productos
-      const { error: stockError } = await supabaseClient.rpc('actualizar_stock_conteo', {
-        p_cod: c.cod,
-        p_cantidad: c.qty,
-        p_nombre: c.incomplete && c.nom ? c.nom : null,
-        p_unidad: c.unit || 'u'
-      });
-      if (stockError) throw stockError;
-
-      // Luego insertar en el historial de conteos
-      // Primero actualizar el stock en productos
-      const { error: stockError } = await supabaseClient.rpc('actualizar_stock_conteo', {
-        p_cod: c.cod,
-        p_cantidad: c.qty,
-        p_nombre: c.incomplete && c.nom ? c.nom : null,
-        p_unidad: c.unit || 'u'
-      });
-      if (stockError) throw stockError;
-
-      // Luego insertar en el historial de conteos
-      // Primero actualizar el stock en productos
-      const { error: stockError } = await supabaseClient.rpc('actualizar_stock_conteo', {
-        p_cod: c.cod,
-        p_cantidad: c.qty,
-        p_nombre: c.incomplete && c.nom ? c.nom : null,
-        p_unidad: c.unit || 'u'
-      });
-      if (stockError) throw stockError;
-
-      // Luego insertar en el historial de conteos
-      // Primero actualizar el stock en productos
-      const { error: stockError } = await supabaseClient.rpc('actualizar_stock_conteo', {
-        p_cod: c.cod,
-        p_cantidad: c.qty,
-        p_nombre: c.incomplete && c.nom ? c.nom : null,
-        p_unidad: c.unit || 'u'
-      });
-      if (stockError) throw stockError;
-
-      // Luego insertar en el historial de conteos
-      // Primero actualizar el stock en productos
-      const { error: stockError } = await supabaseClient.rpc('actualizar_stock_conteo', {
-        p_cod: c.cod,
-        p_cantidad: c.qty,
-        p_nombre: c.incomplete && c.nom ? c.nom : null,
-        p_unidad: c.unit || 'u'
-      });
-      if (stockError) throw stockError;
-
-      // Luego insertar en el historial de conteos
-      // Primero actualizar el stock en productos
-      const { error: stockError } = await supabaseClient.rpc('actualizar_stock_conteo', {
-        p_cod: c.cod,
-        p_cantidad: c.qty,
-        p_nombre: c.incomplete && c.nom ? c.nom : null,
-        p_unidad: c.unit || 'u'
-      });
-      if (stockError) throw stockError;
-
-      // Luego insertar en el historial de conteos
+      // Insertar en historial de conteos
       await supabaseClient.from('conteos').insert({
         user_id: state.user.id,
         producto_cod: c.cod,
