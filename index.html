@@ -239,7 +239,10 @@ body{display:flex;flex-direction:column}
     Código no encontrado.<br>
     <button onclick="countAsNew()">Contar como producto nuevo</button>
   </div>
-  <button class="btn-agregar" id="addBtn" onclick="addToCount()">AGREGAR</button>
+  <div style="display:flex;gap:8px;margin-top:8px">
+    <button class="btn-agregar" id="addBtn" onclick="addToCount()" style="flex:2;margin-top:0">AGREGAR</button>
+    <button onclick="hideProductPanel()" style="flex:1;padding:16px;border-radius:var(--r-m);background:var(--bg-2);border:1px solid var(--brd-1);color:var(--tx-1);font-size:16px;font-weight:600;cursor:pointer">Cancelar</button>
+  </div>
 </div>
 
 <!-- Pantalla de lista de conteos -->
@@ -735,7 +738,10 @@ function renderConteoList() {
           <option value="rollo" ${c.unit==='rollo'?'selected':''}>Rollo</option>
           <option value="L" ${c.unit==='L'?'selected':''}>Litro</option>
         </select></div>` : ''}
-        <button class="save-btn" onclick="saveConteoEdit(${idx})">Guardar</button>
+        <div style="display:flex;gap:6px;margin-top:6px">
+          <button class="save-btn" onclick="saveConteoEdit(${idx})">Guardar</button>
+          <button onclick="deleteConteo(${idx})" style="background:var(--red-bg);color:var(--red);border:1px solid var(--red);padding:8px 16px;border-radius:var(--r-s);font-weight:600;cursor:pointer">Eliminar</button>
+        </div>
       </div>
     </div>
   `).join('');
