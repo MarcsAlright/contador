@@ -69,6 +69,7 @@ body{display:flex;flex-direction:column}
 .visor-placeholder .cam-icon{font-size:48px;opacity:.6;margin-bottom:8px}
 .visor-placeholder .cam-text{font-size:13px;text-transform:uppercase;letter-spacing:1px;font-weight:600}
 .visor-placeholder .start-btn{display:inline-block;margin-top:12px;padding:8px 20px;background:var(--or);color:#fff;border-radius:20px;font-size:14px;font-weight:700;cursor:pointer}
+.guide-box{width:200px;height:200px;border:2px dashed var(--or);border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;margin:0 auto}
 .visor-scanline{position:absolute;left:10%;right:10%;height:2px;background:var(--or);top:50%;z-index:6;box-shadow:0 0 12px var(--or);animation:scanLine 2.2s ease-in-out infinite;display:none}
 @keyframes scanLine{0%,100%{top:30%}50%{top:65%}}
 
@@ -199,9 +200,11 @@ body{display:flex;flex-direction:column}
   <div id="qr-reader" style="display:none"></div>
   <div class="visor-overlay" id="visorFlash"><span class="check">✓</span></div>
   <div class="visor-placeholder" id="visorPlaceholder" onclick="startScanner()">
-    <span class="cam-icon">📷</span>
-    <span class="cam-text">Cámara apagada</span>
-    <span class="start-btn">Iniciar escáner</span>
+    <div class="guide-box">
+      <span class="cam-icon">📷</span>
+      <span class="cam-text">Cámara apagada</span>
+      <span class="start-btn">Iniciar escáner</span>
+    </div>
   </div>
   <div class="visor-scanline" id="scanLine"></div>
 </div>
@@ -472,7 +475,20 @@ async function startScanner() {
     state.html5QrCode = new Html5Qrcode('qr-reader');
     await state.html5QrCode.start(
       { facingMode: 'environment' },
-      { fps: 10, qrbox: { width: 250, height: 100 } },
+      {
+        fps: 10,
+        qrbox: { width: 200, height: 200 },
+        formatsToSupport: [
+          Html5QrcodeSupportedFormats.QR_CODE,
+          Html5QrcodeSupportedFormats.CODE_128,
+          Html5QrcodeSupportedFormats.EAN_13,
+          Html5QrcodeSupportedFormats.EAN_8,
+          Html5QrcodeSupportedFormats.UPC_A,
+          Html5QrcodeSupportedFormats.UPC_E,
+          Html5QrcodeSupportedFormats.CODE_39,
+          Html5QrcodeSupportedFormats.ITF
+        ]
+      },
       (decodedText) => {
         playBeep();
         document.getElementById('searchProd').value = decodedText;
@@ -487,7 +503,7 @@ async function startScanner() {
     document.getElementById('toggleScanBtn').style.display = 'flex';
   } catch (err) {
     console.error(err);
-    document.getElementById('visorPlaceholder').innerHTML = '<span class="cam-icon">⚠️</span><span class="cam-text">Error de cámara</span>';
+    document.getElementById('visorPlaceholder').innerHTML = '<div class="guide-box"><span class="cam-icon">⚠️</span><span class="cam-text">Error de cámara</span></div>';
     document.getElementById('visorPlaceholder').style.display = 'flex';
   }
 }
@@ -501,9 +517,11 @@ async function stopScanner() {
     document.getElementById('scanLine').style.display = 'none';
     document.getElementById('toggleScanBtn').style.display = 'none';
     document.getElementById('visorPlaceholder').innerHTML = `
-      <span class="cam-icon">📷</span>
-      <span class="cam-text">Cámara apagada</span>
-      <span class="start-btn" onclick="startScanner()">Iniciar escáner</span>
+      <div class="guide-box">
+        <span class="cam-icon">📷</span>
+        <span class="cam-text">Cámara apagada</span>
+        <span class="start-btn" onclick="startScanner()">Iniciar escáner</span>
+      </div>
     `;
   }
 }
