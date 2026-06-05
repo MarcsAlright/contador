@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "io.github.marcsalright.twa",
+        "sha256_cert_fingerprints": ["A2:64:98:46:12:E6:BD:67:2D:FE:88:BB:B6:75:C1:3C:5B:07:AB:76:60:EC:B4:55:94:3E:73:47:A6:78:94:B9"]
+      }
+    }]
