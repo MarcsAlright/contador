@@ -1,8 +1,11 @@
 {
+  "id": "https://marcsalright.github.io/contador/",
   "name": "MAGNUM Stock Count",
   "short_name": "StockCount",
+  "description": "Conteo de inventario rápido con escáner para ferretería",
   "start_url": "./",
   "display": "standalone",
+  "orientation": "portrait",
   "background_color": "#0B0F18",
   "theme_color": "#F76B1C",
   "icons": [
