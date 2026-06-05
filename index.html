@@ -882,26 +882,15 @@ async function syncAll() {
         c.incomplete = false;
       }
       
-      // Actualizar stock en productos
+      // Actualizar stock y ubicación con la función segura (Security Definer)
       const { error: stockError } = await supabaseClient.rpc('actualizar_stock_conteo', {
         p_cod: c.cod,
         p_cantidad: c.qty,
         p_nombre: c.incomplete && c.nom ? c.nom : null,
-        p_unidad: c.unit || 'u'
+        p_unidad: c.unit || 'u',
+        p_ubicacion: c.ubicObs || null   // <--- ¡Aquí se envía la ubicación!
       });
       if (stockError) throw stockError;
-
-      // Actualizar ubicación en productos si se registró una
-      if (c.ubicObs) {
-        const { error: ubicError } = await supabaseClient
-          .from('productos')
-          .update({ codigo_ubicacion: c.ubicObs })
-          .eq('cod_interno', c.cod);
-        if (ubicError) {
-          console.error('Error al actualizar ubicación:', ubicError);
-          // No interrumpimos la sincronización por esto, pero lo registramos
-        }
-      }
 
       // Insertar en el historial de conteos
       await supabaseClient.from('conteos').insert({
