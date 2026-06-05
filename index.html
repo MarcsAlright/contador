@@ -8,28 +8,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://unpkg.com/html5-qrcode"></script>
-<!-- Manifest PWA seguro (blob URL) -->
-<script>
-  const manifest = {
-    name: "MAGNUM Stock Count",
-    short_name: "StockCount",
-    start_url: ".",
-    display: "standalone",
-    background_color: "#0B0F18",
-    theme_color: "#F76B1C",
-    icons: [{
-      src: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📦</text></svg>",
-      sizes: "100x100",
-      type: "image/svg+xml"
-    }]
-  };
-  const blob = new Blob([JSON.stringify(manifest)], {type: "application/json"});
-  const manifestURL = URL.createObjectURL(blob);
-  const link = document.createElement("link");
-  link.rel = "manifest";
-  link.href = manifestURL;
-  document.head.appendChild(link);
-</script>
+<!-- Manifest PWA estático -->
+<link rel="manifest" href="./manifest.json">
 <style>
 :root{
  --bg-0:#0B0F18;--bg-1:#131825;--bg-2:#1A2131;--bg-3:#212840;--bg-4:#2A3250;--bg-5:#333D5E;
@@ -1012,5 +992,30 @@ document.querySelectorAll('.sheet-overlay').forEach(overlay => {
   });
 });
 </script>
+
+<!-- Registro del Service Worker -->
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js', { scope: './' })
+        .then(registration => {
+          console.log('SW registrado con scope:', registration.scope);
+
+          registration.addEventListener('updatefound', () => {
+            const newWorker = registration.installing;
+            newWorker.addEventListener('statechange', () => {
+              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                if (confirm('Nueva versión disponible. ¿Actualizar ahora?')) {
+                  window.location.reload();
+                }
+              }
+            });
+          });
+        })
+        .catch(err => console.error('Error al registrar SW:', err));
+    });
+  }
+</script>
+
 </body>
 </html>
