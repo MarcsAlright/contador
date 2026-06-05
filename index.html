@@ -79,7 +79,13 @@ body{display:flex;flex-direction:column}
 .ubic-chip{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
 .ubic-chip .chip{background:var(--bg-2);border:1px solid var(--brd-1);border-radius:20px;padding:6px 12px;font-size:12px;color:var(--tx-1);cursor:pointer;display:flex;align-items:center;gap:4px}
 .ubic-chip .chip.active{background:var(--or);color:#fff;border-color:var(--or)}
-.ubic-input{width:100%;background:var(--bg-2);border:1px solid var(--brd-1);border-radius:var(--r-m);padding:8px 12px;color:var(--tx-0);font-size:13px;font-family:var(--f-mono);text-transform:uppercase;margin-top:4px}
+
+/* Fila de 4 campos de ubicación */
+.ubic-row{display:flex;align-items:center;gap:4px;margin-top:4px}
+.ubic-row input{flex:1;min-width:0;background:var(--bg-2);border:1px solid var(--brd-1);border-radius:var(--r-s);padding:8px 6px;color:var(--tx-0);font-size:13px;font-family:var(--f-mono);text-transform:uppercase;text-align:center;outline:none}
+.ubic-row input:focus{border-color:var(--or)}
+.ubic-row .sep{color:var(--tx-2);font-weight:700;font-size:14px}
+
 .btn-agregar{width:100%;padding:16px;border-radius:var(--r-m);background:var(--green);border:none;color:#fff;font-family:var(--f-disp);font-size:20px;font-weight:700;cursor:pointer;margin-top:8px;transition:all 0.15s}
 .btn-agregar:active{transform:scale(0.97);opacity:0.9}
 .new-product-msg{text-align:center;color:var(--yellow);font-size:13px;margin:8px 0}
@@ -221,8 +227,21 @@ body{display:flex;flex-direction:column}
     <button class="qbtn" onclick="changeQty(1)">+</button>
     <button class="calc-btn" onclick="openCalcSheet()" title="Regla de 3">📐</button>
   </div>
+
+  <!-- Chips de ubicaciones recientes -->
   <div class="ubic-chip" id="ubicChipsContainer"></div>
-  <input class="ubic-input" id="ubicObsInput" placeholder="Ubicación (ej. A-1-1)" style="display:none">
+
+  <!-- 4 campos de ubicación -->
+  <div class="ubic-row" id="ubicRow" style="display:none">
+    <input type="text" id="ubicPasillo" placeholder="A" maxlength="4" oninput="autoAdvance(event)" onkeydown="autoBack(event)">
+    <span class="sep">-</span>
+    <input type="text" id="ubicEstanteria" placeholder="1" maxlength="4" oninput="autoAdvance(event)" onkeydown="autoBack(event)">
+    <span class="sep">-</span>
+    <input type="text" id="ubicEstante" placeholder="1" maxlength="4" oninput="autoAdvance(event)" onkeydown="autoBack(event)">
+    <span class="sep">-</span>
+    <input type="text" id="ubicBatea" placeholder="1" maxlength="4" oninput="autoAdvance(event)" onkeydown="autoBack(event)">
+  </div>
+
   <div id="newProductBox" style="display:none" class="new-product-msg">
     Código no encontrado.<br>
     <button onclick="countAsNew()">Contar como producto nuevo</button>
@@ -652,31 +671,83 @@ function hideProductPanel() {
   document.getElementById('searchProd').value = '';
   state.currentProduct = null;
   state.currentQty = 1;
+  clearUbicFields();
+}
+
+// ==================== MANEJO DE LOS 4 CAMPOS DE UBICACIÓN ====================
+function buildUbicObsFromFields() {
+  const p = document.getElementById('ubicPasillo').value.trim().toUpperCase();
+  const e = document.getElementById('ubicEstanteria').value.trim().toUpperCase();
+  const s = document.getElementById('ubicEstante').value.trim().toUpperCase();
+  const b = document.getElementById('ubicBatea').value.trim().toUpperCase();
+  const parts = [p, e, s, b].filter(v => v !== '');
+  return parts.length > 0 ? parts.join('-') : null;
+}
+
+function fillUbicFieldsFromString(locStr) {
+  const parts = (locStr || '').split('-');
+  document.getElementById('ubicPasillo').value = parts[0] || '';
+  document.getElementById('ubicEstanteria').value = parts[1] || '';
+  document.getElementById('ubicEstante').value = parts[2] || '';
+  document.getElementById('ubicBatea').value = parts[3] || '';
+  document.getElementById('ubicRow').style.display = 'flex';
+}
+
+function clearUbicFields() {
+  document.getElementById('ubicPasillo').value = '';
+  document.getElementById('ubicEstanteria').value = '';
+  document.getElementById('ubicEstante').value = '';
+  document.getElementById('ubicBatea').value = '';
+  document.getElementById('ubicRow').style.display = 'none';
+}
+
+function autoAdvance(e) {
+  const input = e.target;
+  if (input.value.length >= 1) {
+    const next = input.nextElementSibling;
+    // Saltar el separador (span) para llegar al siguiente input
+    if (next && next.tagName === 'SPAN') {
+      const nextInput = next.nextElementSibling;
+      if (nextInput && nextInput.tagName === 'INPUT') nextInput.focus();
+    }
+  }
+}
+
+function autoBack(e) {
+  if (e.key === 'Backspace' && e.target.value === '') {
+    const prev = e.target.previousElementSibling;
+    if (prev && prev.tagName === 'SPAN') {
+      const prevInput = prev.previousElementSibling;
+      if (prevInput && prevInput.tagName === 'INPUT') prevInput.focus();
+    }
+  }
 }
 
 function renderUbicChips() {
   const container = document.getElementById('ubicChipsContainer');
   if (state.recentLocations.length === 0) {
-    document.getElementById('ubicObsInput').style.display = 'block';
+    // Solo mostrar los campos si no hay chips
+    document.getElementById('ubicRow').style.display = 'flex';
     container.innerHTML = '';
     return;
   }
-  container.innerHTML = state.recentLocations.map(loc => `<span class="chip" onclick="selectUbicChip(event, '${loc}')">📍 ${loc}</span>`).join('') +
-    `<span class="chip" onclick="showUbicInput()">✏️ Otra</span>`;
-  document.getElementById('ubicObsInput').style.display = 'none';
+  container.innerHTML = state.recentLocations.map(loc => 
+    `<span class="chip" onclick="selectUbicChip(event, '${loc}')">📍 ${loc}</span>`
+  ).join('') + `<span class="chip" onclick="showUbicFields()">✏️ Otra</span>`;
+  // Ocultar los campos hasta que se seleccione un chip o "Otra"
+  document.getElementById('ubicRow').style.display = 'none';
 }
 
 function selectUbicChip(e, loc) {
-  document.getElementById('ubicObsInput').value = loc;
-  document.getElementById('ubicObsInput').style.display = 'block';
+  fillUbicFieldsFromString(loc);
+  // Resaltar chip activo
   document.querySelectorAll('#ubicChipsContainer .chip').forEach(c => c.classList.remove('active'));
   e.target.classList.add('active');
 }
 
-function showUbicInput() {
-  document.getElementById('ubicObsInput').style.display = 'block';
-  document.getElementById('ubicObsInput').value = '';
-  document.getElementById('ubicObsInput').focus();
+function showUbicFields() {
+  clearUbicFields();
+  document.getElementById('ubicRow').style.display = 'flex';
 }
 
 // ==================== CANTIDAD ====================
@@ -694,13 +765,14 @@ function validateQty() {
 // ==================== AGREGAR AL CONTEO ====================
 function countAsNew() {
   const prod = state.currentProduct;
+  const ubicObs = buildUbicObsFromFields();
   state.conteos.push({
     cod: prod.cod_interno,
     nom: '',
     qty: state.currentQty,
     unit: state.selectedUnit || 'u',
     ubic: state.location,
-    ubicObs: document.getElementById('ubicObsInput')?.value.trim().toUpperCase() || null,
+    ubicObs: ubicObs,
     synced: false,
     incomplete: true,
     operador: state.operator || state.user.email
@@ -714,7 +786,7 @@ function countAsNew() {
 function addToCount() {
   if (!state.currentProduct || state.currentProduct.es_nuevo) return;
   const prod = state.currentProduct;
-  const ubicObs = document.getElementById('ubicObsInput')?.value.trim().toUpperCase() || null;
+  const ubicObs = buildUbicObsFromFields();
   if (ubicObs && !state.recentLocations.includes(ubicObs)) {
     state.recentLocations.unshift(ubicObs);
     if (state.recentLocations.length > 5) state.recentLocations.pop();
@@ -870,7 +942,6 @@ async function syncAll() {
   
   try {
     for (const c of pendientes) {
-      // Si el producto está incompleto y ya tiene nombre, lo damos de alta
       if (c.incomplete && c.nom) {
         await supabaseClient.rpc('alta_producto_rapido', {
           p_cod: c.cod,
@@ -882,17 +953,15 @@ async function syncAll() {
         c.incomplete = false;
       }
       
-      // Actualizar stock y ubicación con la función segura (Security Definer)
       const { error: stockError } = await supabaseClient.rpc('actualizar_stock_conteo', {
         p_cod: c.cod,
         p_cantidad: c.qty,
         p_nombre: c.incomplete && c.nom ? c.nom : null,
         p_unidad: c.unit || 'u',
-        p_ubicacion: c.ubicObs || null   // <--- ¡Aquí se envía la ubicación!
+        p_ubicacion: c.ubicObs || null
       });
       if (stockError) throw stockError;
 
-      // Insertar en el historial de conteos
       await supabaseClient.from('conteos').insert({
         user_id: state.user.id,
         producto_cod: c.cod,
