@@ -870,16 +870,19 @@ async function syncAll() {
   
   try {
     for (const c of pendientes) {
+      // Si el producto está incompleto y ya tiene nombre, lo damos de alta
       if (c.incomplete && c.nom) {
         await supabaseClient.rpc('alta_producto_rapido', {
           p_cod: c.cod,
           p_nombre: c.nom,
           p_unidad: c.unit,
-          p_cantidad_inicial: 0
+          p_cantidad_inicial: 0,
+          p_ubicacion: c.ubicObs || null
         });
         c.incomplete = false;
       }
       
+      // Actualizar stock en productos
       const { error: stockError } = await supabaseClient.rpc('actualizar_stock_conteo', {
         p_cod: c.cod,
         p_cantidad: c.qty,
@@ -888,6 +891,19 @@ async function syncAll() {
       });
       if (stockError) throw stockError;
 
+      // Actualizar ubicación en productos si se registró una
+      if (c.ubicObs) {
+        const { error: ubicError } = await supabaseClient
+          .from('productos')
+          .update({ codigo_ubicacion: c.ubicObs })
+          .eq('cod_interno', c.cod);
+        if (ubicError) {
+          console.error('Error al actualizar ubicación:', ubicError);
+          // No interrumpimos la sincronización por esto, pero lo registramos
+        }
+      }
+
+      // Insertar en el historial de conteos
       await supabaseClient.from('conteos').insert({
         user_id: state.user.id,
         producto_cod: c.cod,
